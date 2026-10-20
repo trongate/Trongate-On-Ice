@@ -1,0 +1,89 @@
+body {
+    background: #636ec6;
+    color: #ddd;
+    text-align: center;
+    font-family: "Lucida Console", Monaco, monospace;
+    padding: 0;
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+main {
+    margin-top: -3em;
+}
+
+ul {
+    list-style-type: none;
+}
+
+li {
+    margin-bottom: 0.5em;
+}
+
+button {
+    font-size: 0.7em;
+    font-weight: bold;
+    padding: 0.6em;
+    margin-left: 1em;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+
+h1 {
+    margin-top: 0;
+}
+
+h1,
+h2 {
+    text-transform: uppercase;
+}
+
+textarea {
+    width: 80%;
+    margin: 0 auto;
+    height: 50vh;
+    font-size: .9em;
+}
+
+.warning {
+    background: orange;
+    color: white;
+}
+
+.danger {
+    background: red;
+    color: white;
+}
+
+.success {
+    background: green;
+    color: white;
+}
+
+p {
+    max-width: 70vw;
+    margin-bottom: 1em;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 2em;
+}
+
+a:link {
+    color: white;
+}
+
+.blink {
+  animation: blinker 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes blinker {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}

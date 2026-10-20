@@ -1,0 +1,277 @@
+# Changelog
+
+This file captures all notable changes to the [Trongate PHP framework](https://github.com/trongate/trongate-framework) from v2 onward. v2 was released in January 2026.
+
+The format of this file is based on [Keep a Changelog](https://keepachangelog.com/). 
+
+The Trongate project uses the version format: `{major version}.{year}.{month}{day}`, for example, `2.2026.0522`, which stands for: major version 2, released, 22 May 2026.
+
+The current version of the framework is documented in its [license.txt](https://github.com/trongate/trongate-framework/blob/master/license.txt) file.
+
+## [2.2026.1019] - 2026-10-19
+
+### Security
+- **Login cookie — `HttpOnly`, `SameSite` and `Secure`** (`modules/trongate_tokens/Trongate_tokens_model.php`, `modules/trongate_tokens/Trongate_tokens.php`, `modules/login/Login_model.php`, `modules/trongate_administrators/Trongate_administrators_model.php`) — the `trongatetoken` cookie was emitted from four sites, each with a bare `setcookie('trongatetoken', $token, $expiry, '/')`, so it carried no `HttpOnly`, no `SameSite` and no `Secure` attribute: any script running on the page could read the login token, and a browser would also attach it to cross-site top-level POSTs. Setting and clearing now pass through a single method, `Trongate_tokens_model::set_token_cookie()`, surfaced on the controller as `Trongate_tokens::set_token_cookie()`, which always writes `path=/`, `HttpOnly` and `SameSite=Lax`, and adds `Secure` when `BASE_URL` begins with `https://` — a site running on plain HTTP therefore receives exactly the cookie it received before. `generate_token()` (`set_cookie => true`), `destroy()`, the remember-me branch of `Login_model` and its counterpart in `Trongate_administrators_model` all call it, so a logout now clears the cookie with the same attributes that set it. No configuration value, database column or method signature changed. ([#278](https://github.com/trongate/trongate-framework/pull/278))
+
+## [2.2026.0927] - 2026-09-27
+
+### Added
+- **Flo — "Ask a Question" panel** (`modules/trongate_control/evo`) — the new `ask()` method and `views/ask.php` render a panel in Flo's `main`, the same way *Module Manager* does: a short message for a developer who is stuck, an **Ask a question** button that opens the discussion forums' question form (`https://trongate.io/forums-forum_threads/create/trongate-v2`) in a new tab, and a **Go Back** button that returns to the Flo menu through `doReset()`, the dismissal the "module generated" output already uses. Nothing is embedded and nothing is stored — the destination is a top-level navigation and the forums carry the authentication, validation, CSRF protection and moderation, so no cookie, CSP or `frame-ancestors` change was needed, no config value was added and no new module was created. The destination URL is supplied by `ask()` rather than by the view, so a move is a one-line change. ([#275](https://github.com/trongate/trongate-framework/pull/275))
+
+### Changed
+- **Flo menu — the *Discussion Forums* item** (`modules/trongate_control/evo/views/home.php`) — the third menu item opened `https://trongate.io/forums` in a new tab; it now renders the *Ask a Question* panel in `main` instead. The existing `mx-get`/`mx-target` contract and the `open_url:` postMessage handler are untouched, and the two other items are unchanged. ([#275](https://github.com/trongate/trongate-framework/pull/275))
+
+## [2.2026.0923] - 2026-09-23
+
+### Fixed
+- **Module relations wizard — a module that has already been through the image uploader wizard can now take a relation** (`modules/trongate_control/module_relations_builder`) — the pre-flight required a target module's show view to *end* with the details card's closing `</div>`, the anchor the summary panel call is appended to, so it refused to generate against any module whose show view already carried the image uploader builder's panel call (`Modules::run('image_uploader/draw_panel', …)`), which that wizard appends behind the very same card: *"Injection aborted: show view does not end with the details card (</div>)"*. Both wizards append their panel call in the same place, so whichever of them ran **second** on a module was refused — the mirror of the uploader-side fix in [#273](https://github.com/trongate/trongate-framework/pull/273). The check (`view_tail_is_panel_calls()`, a new private helper backed by a `PANEL_CALL_PATTERN` constant) now reads the view's tail — everything behind the last `</div>` — and tolerates panel calls only: an empty tail (a view straight from the module builder) or one or more lines matching a two-argument `Modules::run()` call, the exact shape both wizards generate. The summary panel is still appended at the end of the view, behind any call already there and never in place of it; anything else behind the card still aborts the injection and writes nothing, as does a view with no closing `</div>` at all, so the injection never proceeds on a guess. ([#274](https://github.com/trongate/trongate-framework/pull/274))
+
+## [2.2026.0920d] - 2026-09-20
+
+### Fixed
+- **Image uploader wizard — a module that has already been through the relations wizard can now take an uploader** (`modules/trongate_control/image_uploader_builder`) — the preflight required a target module's show view to *end* with the details card's closing `</div>`, the anchor the `draw_panel()` call is appended to, so it refused to generate against any module whose show view already carried the module relations builder's panel call (`Modules::run('module_relations/draw_summary_panel', …)`), which that wizard appends behind the very same card: *"Injection aborted: the show view does not end with the details card (</div>)"*. Both wizards append their panel call in the same place, so whichever of them ran **second** on a module was refused — a preflight rule too narrow for a module that legitimately carries more than one panel. The check (`view_tail_is_panel_calls()`, a new private helper backed by a `PANEL_CALL_PATTERN` constant) now reads the view's tail — everything behind the last `</div>` — and tolerates panel calls only: an empty tail (a view straight from the module builder) or one or more lines matching a two-argument `Modules::run()` call, the exact shape both wizards generate. The uploader's call is still appended at the end of the view, behind any call already there and never in place of it; anything else behind the card still aborts the injection and writes nothing, as does a view with no closing `</div>` at all, so the injection never proceeds on a guess. The module README's injection-anchors convention and the affected docblocks now say what is tolerated behind the card. ([#273](https://github.com/trongate/trongate-framework/pull/273))
+
+## [2.2026.0920c] - 2026-09-20
+
+### Fixed
+- **Image uploader wizard — chooser offers only modules that pass the preflight** (`modules/trongate_control/image_uploader_builder`) — the chooser listed every candidate module and then, beneath the select form, rendered a second list of the modules that had failed the CRUD preflight together with their raw reason strings. Every failing module was already excluded from the select, so the second list could only mislead, and its `iu-blocked-list` class is defined by no stylesheet, so it rendered as a bare bulleted list. The chooser now renders the same plain list as the sibling builders (`module_builder/views/enter_mod_name.php` and `module_relations_builder/views/select_module.php`), and `index()`'s docblock has been corrected to match. Readiness is unchanged: `get_crud_modules()` still decides it and still returns `reasons` on each row, and `submit_mod()` still refuses a module that is not ready. ([#272](https://github.com/trongate/trongate-framework/pull/272))
+
+## [2.2026.0920b] - 2026-09-20
+
+### Fixed
+- **One to many child panel — offer the parent list, capped at one association** (`modules/module_relations`) — the child side of a one to many rendered its empty-state note instead of an add form, because `fetch_available_options()` returned an empty array for the child view, leaving the panel with no options and no form; the child-side write paths (`submit_association`, `disassociate_association`, `fetch_one_to_many_associated`) were already in place, so the add path was unreachable. The child view now offers every parent record — the same list the child's own create/edit dropdown offers — and `panel_data()` caps that side at a single association, exactly as it already did for one to one: once the child has a parent the add form is hidden and the linked parent is managed from the associated-items list (remove it there and the form returns). A parent's one-to-many panel is never capped, so it keeps offering further children, and the panel heading is now singular whenever the calling side can hold at most one associated record (*Associated Section Type*, but *Associated Sections* for a parent's children). The parent side of a one to many, the one to one and the many to many panels are unchanged, as is the guard that refuses to claim a child already owned by another parent. ([#271](https://github.com/trongate/trongate-framework/pull/271))
+
+## [2.2026.0920] - 2026-09-20
+
+### Fixed
+- **Relation singularisation** (`modules/trongate_control/plural_maker/Plural_maker.php`) — the reverse `-es` rule stripped `es` from any word ending in `es`, so every `-e` noun whose plural is a plain `-s` came back mangled: `section_types` → `section_typ`, `images` → `imag`, `tables` → `tabl`, `types` → `typ`. Two further reverse rules failed the same way (`-ses` → `-sis` turned `licenses` into `licensis` and `addresses` into `addressis`; `-ves` → `-f` turned `valves` into `valf` and `archives` into `archif`), and the `-men` → `-man` fallback was unconditional, so already-singular words such as `specimen` became `speciman`. The `-es` rule now requires a sibilant stem (`ss`, `ch`, `sh`, `x` or `z`, as in `boxes` → `box`), `-ses` → `-sis` and `-es` stripped whole apply only to stems held in explicit reverse dictionaries (the Greek `-sis` nouns, the single-`s` stems such as `bus`/`gases`, and the `-oe` nouns such as `shoe`), `-ves` yields `-ve` unless the word is a dictionary `-f`/`-fe` noun (so `wolves` → `wolf` still holds), `-men` → `-man` applies to known compounds only, and a noun ending in a bare `-ss` is no longer read as a plural. ([#270](https://github.com/trongate/trongate-framework/pull/270))
+- **Relation record names — spaces in settings, underscores in columns** (`modules/trongate_control/module_relations_builder`, `modules/module_relations`) — relation settings hold human-readable record names, which use a space between words (`"section type"`), while every database identifier uses an underscore (`section_type_id`). The builder wrote the wizard's underscore form into the settings JSON, and the runtime derived each foreign key column by appending `_id` to the raw record name, so a relation between multi-word modules built its SQL against a `section type_id` column that cannot exist (`fetch_create_options`, `fetch_available_options`, `fetch_associated_rows`, claim and release paths, and the junction FK column, all affected). The builder now writes the display form (`display_name()`) and normalises every name it turns into a column or method through an idempotent `column_name()`, and the runtime derives all 18 FK/junction column names through a new private `fk_column()` helper instead of concatenating the raw setting. Underscored names and single-word names are unaffected, so existing settings files and previously generated relations behave exactly as before. ([#270](https://github.com/trongate/trongate-framework/pull/270))
+
+## [2.2026.0919] - 2026-09-19
+
+### Added
+- **Image uploader** (`modules/image_uploader`) — new top-level runtime module: a single-image feature for any CRUD module, which generated code calls via `Modules::run()`. The browser/MX surface is `render_panel_body`, `upload_form`, `submit_upload` and `remove_picture` (session-authenticated; both mutating endpoints CSRF-gated), with `draw_panel` and `delete_files` as `block_url()`-guarded internals. It reads the per-module contract written at generation time (`settings/{module}.json`) and validates every identifier against `^[a-z0-9_]+$` on each read, so table, column and storage names are safe to concatenate into SQL and paths. Only the file name is stored; paths and URLs are always built server-side (`modules/{module}/{destination}/{update_id}/` plus a `thumbs/` subfolder). `settings/` ships empty (`.gitkeep`). ([#268](https://github.com/trongate/trongate-framework/pull/268))
+- **Image uploader — builder wizard** (`modules/trongate_control/image_uploader_builder`) — new child module of `trongate_control`: a Create Image Uploader wizard (choose module → generate) that writes the settings JSON, executes an idempotent `ALTER TABLE ... ADD COLUMN VARCHAR(255) NOT NULL DEFAULT ''` (a compatible existing column is left alone and reported; an incompatible one fails loudly and changes nothing) and injects the three call sites into the target module — the `draw_panel()` call in `views/show.php`, the picture file-name capture *before* the row deletion in `submit_delete()`, and the file-removal call *after* it. Eligibility is recomputed server-side, the settings file doubles as the 'already has an uploader' marker, generation is refused unless `ENV` is `dev`, GD is required, and the writable-file preflight fails loudly and writes nothing. Ships with its own module README. ([#268](https://github.com/trongate/trongate-framework/pull/268))
+
+### Changed
+- **Flo module manager** (`modules/trongate_control/evo/views/module_manager.php`, `modules/trongate_control/manifest.json`) — a new **Add Image Uploader** entry sits alongside Create Module and Create Module Relation, and `image_uploader_builder` is registered as a child module of `trongate_control`. ([#268](https://github.com/trongate/trongate-framework/pull/268))
+- **Repository ignore rules** (`.gitignore`) — runtime upload folders (`modules/*/uploads/`) are ignored, so pictures uploaded into an installed app are never committed. ([#268](https://github.com/trongate/trongate-framework/pull/268))
+
+### Fixed
+- **Suspicious-content scan on binary uploads** (`modules/image/Image.php`, `modules/validation/Validation_model.php`) — a bare `<?` is no longer tested for in binary files: `Validation_model::scan_file_content()` now tests for a short open tag only in content that is valid UTF-8, where such a tag can actually be executed, and `Image::validate_image()` no longer tests for it at all, while every remaining pattern spans five or more bytes so that no match can be a chance occurrence. Because compressed image data is effectively random, the old check fired on roughly one in sixteen legitimate images (`3C 3F` occurring in a 4 KB window) and refused them intermittently as security threats, while doing nothing about a payload placed beyond the window. The heuristic is therefore replaced rather than simply removed: an image whose first 4 KB contain the pair is re-encoded from its decoded pixels (`Image::carries_short_open_tag_bytes()`), so no client-supplied bytes for such a file are ever published. `<?php`, `<script`, `<iframe`, `<object`, `<embed`, `<applet` and the function-call patterns are still refused outright. ([#266](https://github.com/trongate/trongate-framework/pull/266))
+- **Unsupported image formats reported honestly** (`modules/image/Image.php`, `modules/validation/Validation_model.php`, `modules/validation/language/en|es|fr/validation_errors.php`) — a valid image in a format the installation cannot process (a GD build without WebP support, a BMP/TIFF/AVIF, an image past the memory guard) is no longer reported as "must be a valid image file": `Image::UNSUPPORTED_FORMAT`, a new public exception code (415), marks the failures that mean *a valid image this installation cannot process*, `run_image_rule()` maps that code to a new `unsupported_image_type_error` message (*"The [label] is a valid image, but this server cannot process that image format."*), the underlying reason is appended to the message when `ENV` is `dev`, and the message is translated into English, Spanish and French. Nothing changes in what is accepted or refused — only in what the user and the developer are told. ([#267](https://github.com/trongate/trongate-framework/pull/267))
+
+## [2.2026.0917] - 2026-09-17
+
+### Security
+- **Module asset router** (`engine/Core.php`) — `serve_module_asset()` fell through to an implicit `200` with an empty body when a request's path resolved to a directory (`realpath()` succeeds, `is_file()` is then false), so the router confirmed the existence of every directory in a module's tree to an unauthenticated caller. A path that resolves but is not a regular file now returns an explicit `404`.
+- **Image uploads** (`modules/image/Image.php`) — `upload()` now names stored files from `random_bytes(16)`, hex-encoded, in place of `uniqid('img_', true)`, whose leading characters are derived from the current time and were therefore predictable (with `Last-Modified` leaking timing); the stored extension is taken from the MIME type sniffed from the file's **content**, in both the random and the sanitised branch, and an unrecognised MIME type is refused before anything is written, so a misnamed or polyglot upload can no longer land on disk under an extension it did not earn.
+
+### Fixed
+- **CSRF failure responses** (`modules/validation/Validation.php`) — `csrf_block_request()` now decides the response shape via a new `is_javascript_request()` helper: a `Sec-Fetch-Mode` of `cors`/`same-origin`, the legacy `X-Requested-With` header, an `application/json` body, or an `Accept` header that wants JSON but not HTML marks the caller as script-driven, and such a caller now receives a clean `403` instead of an HTML redirect. The gate itself is unchanged — `validation->run()` still enforces CSRF — and the detection is a heuristic for response formatting, not an access-control boundary: every signal it reads can be spoofed by a deliberate caller.
+
+## [2.2026.0903] - 2026-09-03
+
+### Added
+- **Module relations** (`modules/module_relations`) — new top-level runtime module for record-to-record relations, the counterpart that generated code calls via `Modules::run()`: browser endpoints `submit_association` and `remove_association` (session-authenticated, CSRF-gated) plus internals (`draw_summary_panel`, `fetch_create_options`, `sync_create_claim`, `release_create_link`, `release_children`, `release_junction_links`) with `panel_body` and `summary_panel` views. `settings/` ships empty (`.gitkeep`); each app's relation contracts are written there at generation time. ([#262](https://github.com/trongate/trongate-framework/pull/262))
+- **Module relations — builder wizard** (`modules/trongate_control/module_relations_builder`) — new child module of `trongate_control`: a four-step Create Module Relation wizard (relation type → parent module → child module → bridging option) that writes per-app settings JSON to `modules/module_relations/settings/`, executes schema SQL, and injects private, SQL-free helper code into the target modules (summary panels, create-form dropdowns, `sync_*`/`release_*` claim logic). Ships with its own module README; registered in the module manifest. ([#262](https://github.com/trongate/trongate-framework/pull/262))
+- **Summary-panel styling** (`modules/templates/css/admin.css`) — new `.associated-items`/`.associate-form` block (155 lines): the visual contract for the relation panels that generated modules embed on their show pages. ([#262](https://github.com/trongate/trongate-framework/pull/262))
+
+### Changed
+- **Flo Create Module flow** (`modules/trongate_control`) — the interactive Create Module wizard moves out of `evo` into a new `module_builder` child module: its eight wizard views relocate there (git-detected as renames; `evo` keeps the generic shared APIs) and the `flo.php`/`flo_trigger.php` entry points are re-routed to `module_builder`. `site_builder` now auto-executes generated SQL, backticks table identifiers for reserved-word safety, and emits numeric defaults of 0 (the framework's no-NULL sentinel convention); `plural_maker` maps `-ie` stems back correctly (`movies` → `movie`, never `movy`); the manifest registers `module_builder`. ([#262](https://github.com/trongate/trongate-framework/pull/262))
+- **Trongate MX modal builders** (`public/js/trongate-mx.js`) — `mx-build-modal` and `mx-build-iframe` fix their target semantics (an in-modal user `mx-target` is honoured; otherwise the modal body target is saved, forced, then restored) and gain footer action buttons (`showCloseButton`, `showDestroyButton`); modal shell creation is extracted into the shared `Modal.createModalShell`; iframe loading renders a `#515151` background with no spinner. ([#262](https://github.com/trongate/trongate-framework/pull/262))
+
+### Removed
+- `extension/` directory — the stray browser-extension assets (icons + manifest) that had been committed with project-specific noise; the framework repository now carries framework code only. ([#261](https://github.com/trongate/trongate-framework/pull/261))
+
+### Fixed
+- **Trongate MX page-load activations** (`public/js/trongate-mx.js`) — `handlePageLoadedEvents()` referenced an undeclared `event`, throwing on every page-load activation of an element carrying a core `mx-*` attribute and breaking the refresh-a-section pattern (`mx-on-success` on a target with `mx-trigger="activate"`); the stray `event.preventDefault()` call is dropped. ([#262](https://github.com/trongate/trongate-framework/pull/262))
+- **Framework configuration defaults** (`config/config.php`, `config/database.php`) — restored to framework defaults so the setup wizard runs cleanly on a fresh clone or copy. ([#261](https://github.com/trongate/trongate-framework/pull/261))
+
+## [2.2026.0823] - 2026-08-23
+
+### Added
+- **Scoped validation errors** (`modules/form`, `modules/validation`, `engine/tg_helpers/form_helper.php`) — `form_open()` now accepts an opt-in `form_name` attribute, and `validation_errors()` can render a named form's errors via `validation_errors('FORM-<name>')` or the new optional third `$scope` argument. On multi-form pages a summary call inside one form's block can no longer display another form's errors; a mismatched scope abstains without clearing the bucket, so the correct form's block still renders. Fully opt-in — existing calls behave exactly as before. ([#257](https://github.com/trongate/trongate-framework/pull/257))
+
+### Changed
+- `form_label()` docblock (`engine/tg_helpers/form_helper.php`) — removed the phantom `$input_id` parameter that no longer exists and documented the real `['for' => ...]` association mechanism. Documentation only. ([#252](https://github.com/trongate/trongate-framework/pull/252))
+- `File::generate_secure_filename()` docblock (`modules/file/File.php`) — removed a stacked, stale duplicate docblock. Documentation only. ([#253](https://github.com/trongate/trongate-framework/pull/253))
+- `from_trongate_mx()` docblocks (`modules/utilities/Utilities.php`, `engine/tg_helpers/utilities_helper.php`) — corrected the header name from `X-Trongate-MX` to the actual `Trongate-MX-Request`. Documentation only. ([#255](https://github.com/trongate/trongate-framework/pull/255))
+
+### Removed
+- `modules/validation/js/highlight_validation_errorsNEW.js` — a stale duplicate of `highlight_validation_errors.js`, unreferenced anywhere in the framework. ([#251](https://github.com/trongate/trongate-framework/pull/251))
+
+### Fixed
+- **Validation error bucket lifecycle** (`modules/form`, `modules/validation`) — `form_close()` no longer destroys the pending error bucket, so a summary call renders from any placement (before the form, inside the block, or after `form_close()`); `Validation::run()` now clears the bucket on a passing submission to prevent stale errors. ([#237](https://github.com/trongate/trongate-framework/issues/237), [#256](https://github.com/trongate/trongate-framework/pull/256))
+- **`trongate_tokens` regenerate endpoint** (`modules/trongate_tokens`) — the documented `regenerate()` token-rotation endpoint returned `403 Forbidden` because the constructor's `block_url()` blocked all direct URL access; the constructor now exempts the `regenerate` segment while every other method stays blocked. ([#254](https://github.com/trongate/trongate-framework/pull/254))
+- **Trongate MX out-of-band swaps** (`public/js/trongate-mx.js`) — `handleOobSwaps()` ran twice per response when `mx-select-oob` was combined with a resolved `mx-target`, inserting OOB elements twice; the duplicate call in `populateTargetEl()` was removed. ([#241](https://github.com/trongate/trongate-framework/issues/241), [#258](https://github.com/trongate/trongate-framework/pull/258))
+- **Db module reserved-word table names** (`modules/db/Db.php`) — table names are now backtick-quoted in `insert()`, `count()`, `insert_batch()`, `get_where_in()`, `resequence_ids()` and `describe_table()`, allowing MySQL reserved words (e.g. `groups`, `order`, `key`) as table names; the remaining methods already quoted. ([#165](https://github.com/trongate/trongate-framework/issues/165), [#259](https://github.com/trongate/trongate-framework/pull/259))
+
+## [2.2026.0801] - 2026-08-01
+
+### Added
+- **URL protection** (`engine/Core.php`) — private and protected controller methods now return a clean 404 (instead of a fatal 500) when invoked via the URL, thanks to a new `ReflectionMethod` guard in the dispatcher. This completes the three mechanisms for preventing URL access to controller methods: `block_url()` (403 Forbidden), the underscore-first convention (404, enforced at the routing stage before the controller loads), and PHP method visibility (404, clean). In-class calls are unaffected; note that `Modules::run()` performs no visibility check, so private/protected methods cannot be invoked through it from outside the class (PHP error, not 404). ([#249](https://github.com/trongate/trongate-framework/pull/249))
+
+### Changed
+- **Flo/Evo code generator** (`trongate_control`) — the textarea font size in `transferer.css` was raised from `0.6em` to `0.9em` for improved readability. ([#249](https://github.com/trongate/trongate-framework/pull/249))
+
+## [2.2026.0731] - 2026-07-31
+
+### Fixed
+- **Flo/Evo module generator** (`site_builder`) — decimal properties (e.g. price fields) no longer produce syntactically invalid PHP in the generated `create.php`: attribute commas are now emitted only between lines that are actually generated, and non-numeric rule values such as `max length[7,2]` are safely quoted. ([#247](https://github.com/trongate/trongate-framework/pull/247))
+- **Flo/Evo module generator** (`evo`) — the 'Choose Default Order By' wizard step no longer offers an empty-string option, and `submit_order_by()` rejects empty or malformed selections. Generation also falls back to `ORDER BY id` when the session value is empty, preventing `SQLSTATE[42000]` errors on generated manage pages. ([#247](https://github.com/trongate/trongate-framework/pull/247), [#248](https://github.com/trongate/trongate-framework/pull/248))
+
+## [2.2026.0714] - 2026-07-14
+
+### Fixed
+- In `Pagination_model`, the `record_name_plural` property is no longer required and instead defaults to the value 'records'.
+
+## [2.2026.0705] - 2026-07-05
+
+### Added
+- Universal `box-sizing: border-box` reset to `trongate.css`.
+
+## [2.2026.0525] - 2026-07-02
+
+### Added
+- **Core asset serving** — `'download'` added to the directory allowlist in `Core.php`. Module authors can now serve downloadable files from a `download/` subdirectory within their module, enabling clean self-contained backup-distribution endpoints without requiring changes outside the module. ([#243](https://github.com/trongate/trongate-framework/pull/243))
+- The `(:all)` wildcard to the `attempt_custom_routing()` function in `engine/ignition.php`, which was documented but never implemented. ([#242](https://github.com/trongate/trongate-framework/pull/242))
+
+### Fixed
+- In the `trongate_control/evo` child module, the controller and view files now use the correct table name in SQL `ORDER BY` clauses. ([12d1b5d](https://github.com/trongate/trongate-framework/commit/12d1b5d5ccbc6a59978311c08aa3dd4a7de857ee))
+- In the `trongate_control/site_builder` child module, the `donor_model.php` view file now correctly substitutes the column name in SQL `ORDER BY` clauses. ([b27305c](https://github.com/trongate/trongate-framework/commit/b27305cb9dd1be69e5ad19438bc3b4925d41d2e6))
+- `Validation_model::integer()` now correctly flags the string value `'0'` as a non-integer and does not flag the integer `0`. ([29abf3a](https://github.com/trongate/trongate-framework/commit/29abf3ad9f27fc165ef9e26d0aa0e22113b7010a))
+
+## [2.2026.0524] - 2026-06-24
+
+### Fixed
+- **Flo/Evo module generator** (`site_builder`) — `submit_generate_mod()` now auto-creates the `factory/` staging directory if missing, and restores the `index.php` guard file after the pre-generation cleanup sweep. Previously, `empty_directory()` would delete `index.php` on the first run, causing git to lose tracking of `factory/` and breaking subsequent generations with a misleading "insufficient file permissions" error. ([9a54fce](https://github.com/trongate/trongate-framework/commit/9a54fce871c3b57cc0a14b30c7bae8e77ed71850))
+
+## [2.2026.0523] - 2026-06-23
+
+### Added
+- **Flo code generator** (`trongate_control/flo`) — now fully functional with `home()` view and working `draw_flow_trigger()`, accompanied by dedicated CSS and JS assets. ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+- **Evo module wizard** (`trongate_control/evo`) — step-by-step module generation wizard with 11+ views for naming, property configuration, ordering, URL column selection, and generation. ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+- **Plural_maker** (`trongate_control/plural_maker`) — comprehensive English pluralisation engine using pattern-matching rules and embedded dictionaries. ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+- **Properties module** (`trongate_control/properties`) — field property definitions with address data sets for American, British, Canadian, and International formats. ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+- **Properties_builder** (`trongate_control/properties_builder`) — visual properties builder interface loaded in an iframe overlay, with custom CSS, JS, and fonts. ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+- **Query_builder** (`trongate_control/query_builder`) — visual SQL query builder with JOIN support, migrated from the mothership for zero cross-origin dependency. ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+- Module manifest system — `manifest.json` for `trongate_control` with version, dependencies, features, and child module declarations. ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+- `Templates::module_details()` method and corresponding `module_details.php` view for Flo's overlay iframe. ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+- New SVG icon `list` and corresponding `.tg-list` CSS class. ([#234](https://github.com/trongate/trongate-framework/pull/234))
+- `form_url()` helper and accompanying CSS to render `<input type="url">` on HTML forms. ([#231](https://github.com/trongate/trongate-framework/pull/231))
+- Trongate MX `mx-swap-title` attribute. ([#230](https://github.com/trongate/trongate-framework/pull/230))
+- `README.md` in project root. ([#224](https://github.com/trongate/trongate-framework/pull/224))
+- `Login::hash_password()` public method so other modules can reuse the same bcrypt hashing. ([#229](https://github.com/trongate/trongate-framework/pull/229))
+- New CSS custom properties in `trongate.css`: `--modal-danger`, `--modal-danger-dark`, `--overlay-bg`, `--modal-textarea-bg`, `--row-odd-bg`, `--row-hover-bg`. ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+- Global `box-sizing: border-box` reset in `trongate.css`. ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+
+### Changed
+- `Flo::draw_flow_trigger()` reactivated (previously returned empty string). ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+- Flo, Trongate_control, and Site_builder now load Evo for environment-disabled responses instead of inline 403 handling. ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+- `admin.css` reorganised with theme token section headers. ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+- `trongate.css` refactored — line-height values standardised, structural CSS cleaned up. ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+- Site_builder rewritten: removed simulation mode, uses Evo for disabled responses, removed stale views. ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+- Trongate MX updated (JS and minified JS). ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+- Improved spacing of bullet and line elements in the `list` icon. ([#235](https://github.com/trongate/trongate-framework/pull/235))
+- Simplified the blink CSS animation. ([#223](https://github.com/trongate/trongate-framework/pull/223))
+- The `setup` `database_config` view now displays a note that the database will be created automatically. ([#227](https://github.com/trongate/trongate-framework/pull/227))
+
+### Removed
+- `engine/Trongate.php`: `read_manifest()` method (replaced by JSON-based `manifest.json`). ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+- `modules/trongate_control/js/code-generator.js` — deleted. ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+- `modules/trongate_control/js/flo-fetch.js` — deleted. ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+- `modules/trongate_control/webhooks/Webhooks.php` — entire webhooks child module removed. ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+- Stale Site_builder view files: `donor_showBACKUP.php`, `module_created.php`, `views_helper.php`. ([7c014d8](https://github.com/trongate/trongate-framework/commit/7c014d89f4ee393983e0c2dd1c86468cc490cb0a))
+
+### Fixed
+- Placeholder sidebar links set to `href='#'` to prevent 404 errors. ([#238](https://github.com/trongate/trongate-framework/pull/238))
+- Selected themes now apply properly across the admin panel. ([#223](https://github.com/trongate/trongate-framework/pull/223))
+
+## [2.2026.0522] - 2026-05-22
+
+### Added
+- Trongate MX `mx-build-iframe` attribute. ([#ad95458](https://github.com/trongate/trongate-framework/commit/ad954589426786fddc426a83470881460cd6d238), [#574c0fa](https://github.com/trongate/trongate-framework/commit/574c0fab45211038208f61a81875aed51a30da78))
+
+### Changed
+- Disabled the `trongate_control/flo` module trigger (`Flo::draw_flow_trigger()`). ([#574c0fa](https://github.com/trongate/trongate-framework/commit/574c0fab45211038208f61a81875aed51a30da78))
+
+## [2.2026.0520] - 2026-05-20
+
+### Added
+- New SVG icons and corresponding CSS classes: `eye`, `pencil`, `search`. ([#d3be0c0](https://github.com/trongate/trongate-framework/commit/d3be0c04a90b6d5f649f248c694d855a1220f656)) 
+- `site_builder` child module of `trongate_control`. ([#a04e8ed](https://github.com/trongate/trongate-framework/commit/a04e8edaeaa53254924e092a11b56ab6d0b2443e))
+
+### Changed
+- The `tg-admin` custom route is now an alias for `login/login/tg-admin`. ([#e83e8c4](https://github.com/trongate/trongate-framework/commit/e83e8c43a2741d4f625d04688c0b27e6586b2ee6))
+- In the `login` config file, for user level `1`, a `secret_login_word` attribute was added and set to `tg-admin`, and `enable_forgot_password` was set to `false` by default. ([#e83e8c4](https://github.com/trongate/trongate-framework/commit/e83e8c43a2741d4f625d04688c0b27e6586b2ee6))
+- `Login::logout()` was modified to attempt to redirect to the user's secret word page upon logout. ([#e83e8c4](https://github.com/trongate/trongate-framework/commit/e83e8c43a2741d4f625d04688c0b27e6586b2ee6))
+
+### Fixed
+- Added missing `Login::show_404()` method. ([#67088e4](https://github.com/trongate/trongate-framework/commit/67088e47e617fd246f0485f692716ee6102aded8))
+
+## [2.2026.0506] - 2026-05-06
+
+### Added
+- `trongate_email` module and `trongate_email` config file. ([#21e9960](https://github.com/trongate/trongate-framework/commit/21e9960e841891ff8a05ede84327883779afecdf))
+
+### Changed
+- The `login` module sends password reminders using the `trongate_email` module. ([#21e9960](https://github.com/trongate/trongate-framework/commit/21e9960e841891ff8a05ede84327883779afecdf))
+- Updated `‎modules/trongate_control/js/code-generator.js` so that modal width and height values for the Flo module can be non-numeric.  The Query Builder modal dimensions are now approximately `96vw` by `96vh`. ([#e8f1361](https://github.com/trongate/trongate-framework/commit/e8f13611464fe2a38a7410f63cfdb2beb59e71f2))
+
+### Fixed
+- In `config.php`, `DEFAULT_MODULE` and `DEFAULT_METHOD` were set to `setup` and `index` respectively. ([#88191b4](https://github.com/trongate/trongate-framework/commit/88191b43727550cf75d69a8407ee2c51db55a0c2))
+
+## [2.2026.0505] - 2026-05-05
+
+### Added
+- `login` module and `login` config file. ([#61ecc0a](https://github.com/trongate/trongate-framework/commit/61ecc0a07b103f4e3b5249b07bdd8fd28b7f987c))
+- `setup` module. ([#61ecc0a](https://github.com/trongate/trongate-framework/commit/61ecc0a07b103f4e3b5249b07bdd8fd28b7f987c))
+- The `trongate_control/flo` (FLO) code generator child module, accessible through the admin UI when in `dev` mode. ([#b644873](https://github.com/trongate/trongate-framework/commit/b644873f7e54d312044c38296f3ef67eecabe728), [#70ab01b](https://github.com/trongate/trongate-framework/commit/70ab01b0fec4dac709fb8499120dec1dbe110fbf))
+
+### Changed
+- In Trongate CSS, made `.card-body` elements equal height in flexbox layouts. ([#8b40353](https://github.com/trongate/trongate-framework/commit/8b403536be84aa37a8e10cedd96cbcd5f6c088bd))
+
+### Removed
+- The `trongate_administrators` `login` and `not_allowed` view files. ([#61ecc0a](https://github.com/trongate/trongate-framework/commit/61ecc0a07b103f4e3b5249b07bdd8fd28b7f987c))
+
+### Fixed
+- `Language::load()` now returns the correct array, `$phrases`. ([#226](https://github.com/trongate/trongate-framework/pull/226))
+
+## [2.2026.0425] - 2026-04-25
+
+### Added
+- The `Db::attempt_truncate()` public method attempts a `TRUNCATE` SQL statement on a table, resetting the autoincrement counter on success. ([#32cda9e](https://github.com/trongate/trongate-framework/commit/32cda9e74fff1e2b87b0677288a36a0f4820e81a))
+- A new `language` module was added to facilitate multilingual validation messages. ([#245c2c7](https://github.com/trongate/trongate-framework/commit/245c2c7e98b0eadc660c156eda7a5a792347df9a))
+
+### Changed
+- Global helper functions are now thin wrappers over corresponding modules. ([#245c2c7](https://github.com/trongate/trongate-framework/commit/245c2c7e98b0eadc660c156eda7a5a792347df9a))
+- Input validation now supports displaying messages in multiple languages. ([#245c2c7](https://github.com/trongate/trongate-framework/commit/245c2c7e98b0eadc660c156eda7a5a792347df9a))
+- Dummy and broken links in the footer of the admin template were replaced with links to the framework homepage, GitHub repo, and documentation. ([#222](https://github.com/trongate/trongate-framework/pull/222))
+
+### Removed
+- The `file/file_validation` child module was removed. ([#245c2c7](https://github.com/trongate/trongate-framework/commit/245c2c7e98b0eadc660c156eda7a5a792347df9a))
+- The `trongate_administrators/setup.sql` setup file was removed. ([#245c2c7](https://github.com/trongate/trongate-framework/commit/245c2c7e98b0eadc660c156eda7a5a792347df9a))
+
+## [2.2026.0303] - 2026-03-03
+
+### Added
+- The `File::delete_directory()` public method recursively deletes all files and subdirectories of a given directory. ([#24b15ac](https://github.com/trongate/trongate-framework/commit/24b15ac1812bc7cd3f1b781dc34bfa39d2baca3f))
+
+## [2.2026.0223] - 2026-02-23
+
+### Changed
+- `Core::invoke_controller_method()` behavior was modified to make it consistent with `block_url()` behavior. ([#b3bc943](https://github.com/trongate/trongate-framework/commit/b3bc943fa72f2445b98a7e1fdd5a091270689c45))
+- Added `block_url('db')` to `Db.php` constructor to prevent direct URL access to all database methods. ([#b3bc943](https://github.com/trongate/trongate-framework/commit/b3bc943fa72f2445b98a7e1fdd5a091270689c45))
+- Reintroduced `resequence_ids()` method to `Db.php` from v1. ([#b3bc943](https://github.com/trongate/trongate-framework/commit/b3bc943fa72f2445b98a7e1fdd5a091270689c45))
+- The top margin on modal footer buttons was adjusted from `6` to `2` pixels. ([#9e81843](https://github.com/trongate/trongate-framework/commit/9e81843121dc2f46ae7297ee76597c4ff302272a))
+
+## [2.2026.0128] - 2026-01-28
+
+### Changed
+- The date-based versioning system was introduced. ([#91c85f8](https://github.com/trongate/trongate-framework/commit/91c85f83c84c0b465190c0745fabb37c86b8920d))
+- Minor changes to Trongate CSS, using variables instead of hard-coded color hex codes. ([#91c85f8](https://github.com/trongate/trongate-framework/commit/91c85f83c84c0b465190c0745fabb37c86b8920d))
+- Input validation callbacks now prevent URL access by calling the `block_url()` utility helper function. Previously, the callbacks used the underscore (`_`) prefix convention. ([#e2253a0](https://github.com/trongate/trongate-framework/commit/e2253a08857aabfaabf37e70de26c012842eb187))
+
+## [2.0.0-beta.1] - 2026-01-20
+- Initial v2 release. Includes various breaking changes compared to v1.

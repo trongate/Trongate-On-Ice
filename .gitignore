@@ -1,0 +1,16 @@
+
+\.phpintel/
+.idea/
+.vscode/
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Runtime uploads (per-record picture folders created by image_uploader)
+modules/*/uploads/
