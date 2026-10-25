@@ -55,7 +55,7 @@ The priority is long-term stability, predictability and reliability rather than 
 
 ## Why Trongate?
 
-- High performance ([benchmarks](https://trongate.io/benchmarks))
+- High performance ([benchmarks](https://trongateframework.com/benchmarks))
 - Stability-focused
 - Zero dependencies
 - No Composer
@@ -69,9 +69,9 @@ The priority is long-term stability, predictability and reliability rather than 
 
 ## Resources
 
-[Documentation](https://trongate.io/documentation)
+[Documentation](https://trongateframework.com/documentation)
 
-[Discussion Forums](https://trongate.io/forums)
+[Discussion Forums](https://trongateframework.com/forums)
 
 [Main Trongate framework repository](https://github.com/trongate/trongate-framework)
 
