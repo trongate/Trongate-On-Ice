@@ -6,7 +6,7 @@ Trongate on Ice gives you a dependable, consistent foundation to build on, witho
 
 ## What is Trongate on Ice?
 
-Trongate on Ice was forked from Trongate version **2.2026.1019**, the latest version of the original framework at the time. Unlike the main Trongate repository, it does not routinely receive new features, refactoring or general development updates. It is maintained conservatively and changes only when there is a compelling reason.
+Trongate on Ice was forked from Trongate version **2.2026.1028**, the latest version of the original framework at the time. Unlike the main Trongate repository, it does not routinely receive new features, refactoring or general development updates. It is maintained conservatively and changes only when there is a compelling reason.
 
 It remains part of the Trongate ecosystem. It is based on the original framework, uses the same conventions, and works the same way, so existing Trongate knowledge and documentation still apply.
 
@@ -34,7 +34,7 @@ If you want the latest features and ongoing development, use the [main Trongate 
 | Keeping pace with the main branch | Yes | No |
 | Approach to change | Active | Conservative |
 
-Trongate on Ice is based on Trongate version **2.2026.1019**.
+Trongate on Ice is based on Trongate version **2.2026.1028**.
 
 ## Maintenance policy
 
