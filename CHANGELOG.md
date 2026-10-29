@@ -8,6 +8,11 @@ The Trongate project uses the version format: `{major version}.{year}.{month}{da
 
 The current version of the framework is documented in its [license.txt](https://github.com/trongate/trongate-framework/blob/master/license.txt) file.
 
+## [2.2026.1029] - 2026-10-29
+
+### Security
+- **PHP session ID rotated at login and logout** (`modules/trongate_tokens/Trongate_tokens.php`, `modules/login/Login.php`, `modules/login/Login_model.php`, `modules/trongate_administrators/Trongate_administrators.php`, `modules/trongate_administrators/Trongate_administrators_model.php`) — the session is started in `ignition.php` before anyone authenticates and its ID was never rotated, so an ID an attacker knew before login remained valid afterwards (session fixation); on a non-remember login that ID is the only credential on the wire. A new `Trongate_tokens::rotate_session_id()` rotates the ID at both authentication boundaries (`Login_model::log_user_in()` and `Trongate_administrators_model::log_user_in()`) and returns `false` when rotation is impossible, in which case the login is abandoned rather than continuing on the old ID. A fresh CSRF token is issued with `renew_csrf_token()`, and any token the browser already held is destroyed before the new one is minted, so the identity issued at login is the only one that browser can act as. `Login::logout()` rotates too, so the session ID does not outlive the identity it was tied to. No configuration value, database column or existing method signature changed. Synced from Trongate ([#284](https://github.com/trongate/trongate-framework/pull/284)).
+
 ## [2.2026.1028] - 2026-10-28
 
 ### Changed
